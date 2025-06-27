@@ -11,13 +11,13 @@ import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @RequiredArgsConstructor
 @Component
 public class PaymentFailureListener {
-
-    private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
-    private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final StateMachine<String, Map<String, String>> stateMachine;
 
     // KafkaListener는 병렬성이 있는 경우 groupId 필수
     @KafkaListener(topics = "payment.failed.event", groupId = "order-saga")
@@ -25,10 +25,6 @@ public class PaymentFailureListener {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
         String sagaId = event.getSagaId();
-
-        // 2. StateMachine 인스턴스 로드
-        StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-        stateMachinePersister.restore(stateMachine, sagaId);
 
         // 3. Saga 상태 전이
         boolean transitioned = stateMachine.sendEvent(OrderSagaEvent.PAYMENT_FAILURE);

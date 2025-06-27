@@ -10,10 +10,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.statemachine.StateMachineContext;
 import org.springframework.statemachine.StateMachinePersist;
 import org.springframework.statemachine.action.Action;
-import org.springframework.statemachine.config.EnableStateMachine;
-import org.springframework.statemachine.config.EnableStateMachineFactory;
-import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
-import org.springframework.statemachine.config.StateMachineFactory;
+import org.springframework.statemachine.config.*;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
@@ -32,8 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableStateMachine(name = "orderStateMachine")
-@EnableStateMachineFactory
+@EnableStateMachine
 public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -44,7 +40,8 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
         states
             .withStates()
             .initial(ORDER_CREATED)
-            .states(EnumSet.allOf(OrderSagaState.class));
+            .states(EnumSet.allOf(OrderSagaState.class))
+        ;
     }
 
     @Override
@@ -91,4 +88,5 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
                 }
             });
     }
+
 }
