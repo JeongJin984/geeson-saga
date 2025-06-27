@@ -1,6 +1,6 @@
 package com.geeson.geesonsaga.entity;
 
-import com.geeson.geesonsaga.enums.OrderState;
+import com.geeson.geesonsaga.enums.OrderSagaState;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,7 +31,7 @@ public class SagaInstanceEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderState status;
+    private OrderSagaState status;
 
     @Column(columnDefinition = "json")
     private String context;
@@ -45,7 +45,7 @@ public class SagaInstanceEntity {
     @OneToMany(mappedBy = "sagaInstance")
     private List<SagaStepEntity> sagaSteps = new ArrayList<>();
 
-    public void updateStatus(final OrderState newStatus) {
+    public void updateStatus(final OrderSagaState newStatus) {
         this.status = newStatus;
     }
 }

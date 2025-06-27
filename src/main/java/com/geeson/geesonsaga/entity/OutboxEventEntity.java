@@ -1,6 +1,6 @@
 package com.geeson.geesonsaga.entity;
 
-import com.geeson.geesonsaga.enums.OrderEvent;
+import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,7 +31,7 @@ public class OutboxEventEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 100)
-    private OrderEvent eventType; // ex: PaymentRequested, InventoryRollback
+    private OrderSagaEvent eventType; // ex: PaymentRequested, InventoryRollback
 
     @Column(columnDefinition = "json", nullable = false)
     private String payload;

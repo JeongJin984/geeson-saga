@@ -1,7 +1,8 @@
 package com.geeson.geesonsaga.config;
 
-import com.geeson.geesonsaga.enums.OrderEvent;
-import com.geeson.geesonsaga.enums.OrderState;
+import com.geeson.geesonsaga.command.CommandGateway;
+import com.geeson.geesonsaga.enums.OrderSagaEvent;
+import com.geeson.geesonsaga.enums.OrderSagaState;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
@@ -11,55 +12,67 @@ import org.springframework.statemachine.config.builders.StateMachineTransitionCo
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.state.State;
 import org.springframework.stereotype.Service;
+import static com.geeson.geesonsaga.enums.OrderSagaEvent.*;
+import static com.geeson.geesonsaga.enums.OrderSagaState.*;
 
 import java.util.EnumSet;
 
 @Service
-public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderState, OrderEvent> {
+public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
     private KafkaTemplate<String, String> kafkaTemplate;
+    private CommandGateway commandGateway;
 
     public OrderStateMachineConfig(KafkaTemplate<String, String> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
     @Override
-    public void configure(StateMachineStateConfigurer<OrderState, OrderEvent> states) throws Exception {
+    public void configure(StateMachineStateConfigurer<OrderSagaState, OrderSagaEvent> states) throws Exception {
         states
             .withStates()
-            .initial(OrderState.NEW)
-            .states(EnumSet.allOf(OrderState.class));
+            .initial(ORDER_CREATED)
+            .states(EnumSet.allOf(OrderSagaState.class));
     }
 
     @Override
-    public void configure(StateMachineTransitionConfigurer<OrderState, OrderEvent> transitions) throws Exception {
+    public void configure(StateMachineTransitionConfigurer<OrderSagaState, OrderSagaEvent> transitions) throws Exception {
         transitions
-            .withExternal().source(OrderState.NEW).target(OrderState.PAYMENT_PENDING)
-            .event(OrderEvent.CREATE_ORDER).action(kafkaAction("order.created"))
+            .withExternal()
+            .source(ORDER_CREATED).target(PAYMENT_REQUESTED).event(START_ORDER)
+
             .and()
-            .withExternal().source(OrderState.PAYMENT_PENDING).target(OrderState.PAYMENT_COMPLETED)
-            .event(OrderEvent.PAYMENT_SUCCESS).action(kafkaAction("payment.success"))
+            .withExternal()
+            .source(PAYMENT_REQUESTED).target(PAYMENT_COMPLETED).event(PAYMENT_SUCCESS)
+            .action(commandGateway.inventoryReserveRequest())
+
             .and()
-            .withExternal().source(OrderState.PAYMENT_PENDING).target(OrderState.PAYMENT_FAILED)
-            .event(OrderEvent.PAYMENT_ERROR).action(kafkaAction("payment.error"))
+            .withExternal()
+            .source(PAYMENT_REQUESTED).target(FAILED).event(PAYMENT_FAILURE)
+
             .and()
-            .withExternal().source(OrderState.PAYMENT_COMPLETED).target(OrderState.INVENTORY_PENDING)
-            .event(OrderEvent.RESERVE_INVENTORY).action(kafkaAction("inventory.check"))
+            .withExternal()
+            .source(PAYMENT_COMPLETED).target(INVENTORY_RESERVED).event(INVENTORY_SUCCESS)
+
             .and()
-            .withExternal().source(OrderState.INVENTORY_PENDING).target(OrderState.COMPLETED)
-            .event(OrderEvent.INVENTORY_SUCCESS).action(kafkaAction("order.completed"))
+            .withExternal()
+            .source(OrderSagaState.PAYMENT_COMPLETED)
+            .target(OrderSagaState.COMPENSATING)
+            .event(OrderSagaEvent.INVENTORY_FAILURE)
+            .action(commandGateway.inventoryFailureCompensateAction())
+
             .and()
-            .withExternal().source(OrderState.INVENTORY_PENDING).target(OrderState.INVENTORY_FAILED)
-            .event(OrderEvent.INVENTORY_ERROR).action(kafkaAction("inventory.failed"));
+            .withExternal()
+            .source(INVENTORY_RESERVED).target(ORDER_COMPLETED).event(OrderSagaEvent.valueOf("COMPLETE"));
     }
 
     @Override
-    public void configure(StateMachineConfigurationConfigurer<OrderState, OrderEvent> config) throws Exception {
+    public void configure(StateMachineConfigurationConfigurer<OrderSagaState, OrderSagaEvent> config) throws Exception {
         config
             .withConfiguration()
             .listener(new StateMachineListenerAdapter<>() {
                 @Override
-                public void stateChanged(State<OrderState, OrderEvent> from, State<OrderState, OrderEvent> to) {
+                public void stateChanged(State<OrderSagaState, OrderSagaEvent> from, State<OrderSagaState, OrderSagaEvent> to) {
                     if (to != null) {
                         kafkaTemplate.send("state", to.getId().name());
                     }
@@ -67,7 +80,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
             });
     }
 
-    private Action<OrderState, OrderEvent> kafkaAction(String message) {
+    private Action<OrderSagaState, OrderSagaEvent> kafkaAction(String message) {
         return context -> kafkaTemplate.send("events", message);
     }
 }
