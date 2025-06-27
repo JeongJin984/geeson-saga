@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @RequiredArgsConstructor
+@EnableStateMachine(name = "orderStateMachine")
 @EnableStateMachineFactory
 public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
