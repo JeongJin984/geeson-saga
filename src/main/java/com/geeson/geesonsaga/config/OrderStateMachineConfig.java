@@ -3,29 +3,39 @@ package com.geeson.geesonsaga.config;
 import com.geeson.geesonsaga.command.CommandGateway;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.statemachine.StateMachineContext;
+import org.springframework.statemachine.StateMachinePersist;
 import org.springframework.statemachine.action.Action;
+import org.springframework.statemachine.config.EnableStateMachine;
 import org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter;
+import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
+import org.springframework.statemachine.config.model.StateMachineModelFactory;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
+import org.springframework.statemachine.persist.DefaultStateMachinePersister;
+import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.statemachine.state.State;
 import org.springframework.stereotype.Service;
 import static com.geeson.geesonsaga.enums.OrderSagaEvent.*;
 import static com.geeson.geesonsaga.enums.OrderSagaState.*;
 
 import java.util.EnumSet;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-@Service
+@Configuration
+@RequiredArgsConstructor
+@EnableStateMachine
 public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
-    private KafkaTemplate<String, String> kafkaTemplate;
-    private CommandGateway commandGateway;
-
-    public OrderStateMachineConfig(KafkaTemplate<String, String> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-    }
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final CommandGateway commandGateway;
 
     @Override
     public void configure(StateMachineStateConfigurer<OrderSagaState, OrderSagaEvent> states) throws Exception {
@@ -78,9 +88,5 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
                     }
                 }
             });
-    }
-
-    private Action<OrderSagaState, OrderSagaEvent> kafkaAction(String message) {
-        return context -> kafkaTemplate.send("events", message);
     }
 }
