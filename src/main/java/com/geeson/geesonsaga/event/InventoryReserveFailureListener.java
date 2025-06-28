@@ -27,6 +27,7 @@ public class InventoryReserveFailureListener {
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
 
+    @KafkaListener(topics = "inventory.reserve.failure.event", groupId = "order-saga")
     public void handleInventoryReserveFailure(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);

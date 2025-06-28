@@ -24,6 +24,8 @@ public class PaymentSuccessListener {
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
 
+
+    @KafkaListener(topics = "payment.request.success.event", groupId = "order-saga")
     public void handlePaymentSuccess(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);

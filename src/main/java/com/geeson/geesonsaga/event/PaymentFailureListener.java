@@ -23,6 +23,7 @@ public class PaymentFailureListener {
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
 
     // KafkaListener는 병렬성이 있는 경우 groupId 필수
+    @KafkaListener(topics = "payment.request.failure.event", groupId = "order-saga")
     public void handlePaymentFailure(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);

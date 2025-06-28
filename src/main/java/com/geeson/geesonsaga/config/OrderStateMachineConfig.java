@@ -72,7 +72,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
 
             .and()
             .withExternal()
-            .source(INVENTORY_RESERVED).target(ORDER_COMPLETED).event(OrderSagaEvent.valueOf("COMPLETE"));
+            .source(INVENTORY_RESERVED).target(ORDER_COMPLETED).event(COMPLETE);
     }
 
     @Override
