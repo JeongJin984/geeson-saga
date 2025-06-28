@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
+@EnableStateMachineFactory
 @RequiredArgsConstructor
-@EnableStateMachine
 public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -79,6 +79,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
     public void configure(StateMachineConfigurationConfigurer<OrderSagaState, OrderSagaEvent> config) throws Exception {
         config
             .withConfiguration()
+            .autoStartup(false)
             .listener(new StateMachineListenerAdapter<>() {
                 @Override
                 public void stateChanged(State<OrderSagaState, OrderSagaEvent> from, State<OrderSagaState, OrderSagaEvent> to) {
@@ -87,6 +88,14 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
                     }
                 }
             });
+    }
+
+
+
+    @Bean
+    public StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister(
+        JpaPersistingStateMachinePersist persist) {
+        return new DefaultStateMachinePersister<>(persist);
     }
 
 }
