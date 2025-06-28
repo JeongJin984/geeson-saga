@@ -8,7 +8,10 @@ spring:
     password: rootpass^^*
   kafka:
     bootstrap-servers: localhost:9092
-
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
 
 uuid:
   node-id: ${NODE_ID:0}

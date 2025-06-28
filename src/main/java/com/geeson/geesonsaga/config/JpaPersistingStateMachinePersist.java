@@ -3,12 +3,12 @@ package com.geeson.geesonsaga.config;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geeson.geesonsaga.entity.StateMachineContextEntity;
-import com.geeson.geesonsaga.entity.StateMachineContextJpaRepository;
+import com.geeson.geesonsaga.entity.repository.StateMachineContextJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
+import com.geeson.geesonsaga.support.UuidGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.statemachine.StateMachineContext;
-import org.springframework.statemachine.StateMachineContextRepository;
 import org.springframework.statemachine.StateMachinePersist;
 import org.springframework.stereotype.Component;
 
@@ -19,13 +19,14 @@ import java.io.IOException;
 public class JpaPersistingStateMachinePersist implements StateMachinePersist<OrderSagaState, OrderSagaEvent, String> {
     private final StateMachineContextJpaRepository repository;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UuidGenerator uuidGenerator;
 
     @Override
     public void write(StateMachineContext<OrderSagaState, OrderSagaEvent> context, String sagaId) throws Exception {
         String json = objectMapper.writeValueAsString(context);
 
         StateMachineContextEntity entity = new StateMachineContextEntity();
-        entity.setId(sagaId);
+        entity.setId(String.valueOf(uuidGenerator.nextId()));
         entity.setContextJson(json);
 
         repository.save(entity);

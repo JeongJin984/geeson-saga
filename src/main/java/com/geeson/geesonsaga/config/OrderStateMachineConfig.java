@@ -49,6 +49,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
         transitions
             .withExternal()
             .source(ORDER_CREATED).target(PAYMENT_REQUESTED).event(START_ORDER)
+            .action(commandGateway.paymentRequestCommand())
 
             .and()
             .withExternal()
