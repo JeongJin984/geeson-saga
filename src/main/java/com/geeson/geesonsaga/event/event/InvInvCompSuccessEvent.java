@@ -8,4 +8,5 @@ public class InvInvCompSuccessEvent {
     private String stepId;
     private String orderId;
     private String inventoryId;
+    private String message;
 }

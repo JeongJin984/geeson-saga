@@ -34,7 +34,9 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
         states
             .withStates()
             .initial(ORDER_CREATED)
-            .states(EnumSet.allOf(OrderSagaState.class))
+            .end(ORDER_COMPLETED)
+            .end(FAILED)
+            .end(COMPENSATED)
         ;
     }
 
@@ -42,33 +44,69 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
     public void configure(StateMachineTransitionConfigurer<OrderSagaState, OrderSagaEvent> transitions) throws Exception {
         transitions
             .withExternal()
-            .source(ORDER_CREATED).target(PAYMENT_REQUESTED).event(START_ORDER)
+            .source(ORDER_CREATED)
+            .event(START_ORDER)
+            .target(PAYMENT_REQUESTED)
             .action(commandGateway.paymentRequestCommand())
 
             .and()
             .withExternal()
-            .source(PAYMENT_REQUESTED).target(PAYMENT_COMPLETED).event(PAYMENT_SUCCESS)
+            .source(PAYMENT_REQUESTED)
+            .event(PAYMENT_SUCCESS)
+            .target(PAYMENT_COMPLETED)
             .action(commandGateway.inventoryReserveRequest())
 
             .and()
             .withExternal()
-            .source(PAYMENT_REQUESTED).target(FAILED).event(PAYMENT_FAILURE)
+            .source(PAYMENT_REQUESTED)
+            .event(PAYMENT_FAILURE)
+            .target(FAILED)
 
             .and()
             .withExternal()
-            .source(PAYMENT_COMPLETED).target(INVENTORY_RESERVED).event(INVENTORY_SUCCESS)
+            .source(PAYMENT_COMPLETED)
+            .event(INVENTORY_SUCCESS)
+            .target(INVENTORY_RESERVED)
 
             .and()
             .withExternal()
-            .source(OrderSagaState.PAYMENT_COMPLETED)
-            .target(OrderSagaState.COMPENSATING)
-            .event(OrderSagaEvent.INVENTORY_FAILURE)
+            .source(PAYMENT_COMPLETED)
+            .event(INVENTORY_FAILURE)
+            .target(COMPENSATING_PAYMENT)
             .action(commandGateway.inventoryFailurePaymentCompensateAction())
+
+            .and()
+            .withExternal()
+            .source(COMPENSATING_PAYMENT)
+            .event(PAYMENT_COMPENSATED)
+            .target(COMPENSATING_INVENTORY)
             .action(commandGateway.inventoryFailureInventoryCompensateAction())
 
             .and()
             .withExternal()
-            .source(INVENTORY_RESERVED).target(ORDER_COMPLETED).event(COMPLETE);
+            .source(COMPENSATING_INVENTORY)
+            .event(INVENTORY_COMPENSATED)
+            .target(COMPENSATED)
+
+            .and()
+            .withExternal()
+            .source(COMPENSATING_PAYMENT)
+            .event(PAYMENT_COMPENSATE_FAIL)
+            .target(FAILED)
+            .action(commandGateway.paymentInventoryCompensateFailDLQ())
+
+            .and()
+            .withExternal()
+            .source(COMPENSATING_INVENTORY)
+            .event(INVENTORY_COMPENSATE_FAIL)
+            .target(FAILED)
+            .action(commandGateway.inventoryCompensateFailDLQ())
+
+            .and()
+            .withExternal()
+            .source(INVENTORY_RESERVED)
+            .event(COMPLETE)
+            .target(ORDER_COMPLETED);
     }
 
     @Override

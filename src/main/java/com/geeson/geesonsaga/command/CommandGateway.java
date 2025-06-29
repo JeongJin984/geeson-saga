@@ -91,4 +91,11 @@ public class CommandGateway {
         };
     }
 
+    public Action<OrderSagaState, OrderSagaEvent> paymentInventoryCompensateFailDLQ() {
+        return context -> {};
+    }
+
+    public Action<OrderSagaState, OrderSagaEvent> inventoryCompensateFailDLQ() {
+        return context -> {};
+    }
 }

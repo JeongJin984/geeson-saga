@@ -13,14 +13,33 @@ import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
-
 @RequiredArgsConstructor
 @Component
-public class PaymentFailureListener {
+public class PaymentRequestListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
+
+    @KafkaListener(topics = "payment.request.success.event", groupId = "order-saga")
+    public void handlePaymentSuccess(String message) throws Exception {
+        // 1. Kafka 메시지 파싱
+        PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
+        String sagaId = event.getSagaId();
+
+        StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+
+        // 3. Saga 상태 전이
+        stateMachine
+            .sendEvent(
+                Mono.just(MessageBuilder.withPayload(OrderSagaEvent.PAYMENT_FAILURE).build())
+            )
+            .subscribe();
+
+        // 4. 상태 저장
+        stateMachinePersister.persist(stateMachine, sagaId);
+
+        System.out.println("Payment success for sagaId: " + sagaId);
+    }
 
     // KafkaListener는 병렬성이 있는 경우 groupId 필수
     @KafkaListener(topics = "payment.request.failure.event", groupId = "order-saga")

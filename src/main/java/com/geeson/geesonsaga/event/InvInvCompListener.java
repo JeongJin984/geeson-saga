@@ -31,7 +31,7 @@ public class InvInvCompListener {
     private final SagaStepJpaRepository sagaStepJpaRepository;
     private final SagaInstanceJpaRepository sagaInstanceRepository;
 
-    @KafkaListener(topics = "inv.inv.comp.ok.event", groupId = "order-saga")
+    @KafkaListener(topics = "order-inv-inv-comp-ok-event", groupId = "order-saga")
     public void handleInvInvCompSuccessEvent(String message) {
         InvInvCompSuccessEvent event = null;
         try {
@@ -43,7 +43,7 @@ public class InvInvCompListener {
         }
     }
 
-    @KafkaListener(topics = "inv.inv.comp.fail.event", groupId = "order-saga")
+    @KafkaListener(topics = "order-inv-inv-comp-fail-event", groupId = "order-saga")
     public void handleInvInvCompFailEvent(String message) {
         InvInvCompFailEvent event = null;
         try {

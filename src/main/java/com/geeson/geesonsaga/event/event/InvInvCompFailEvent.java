@@ -10,4 +10,5 @@ public class InvInvCompFailEvent {
     private String stepId;
     private String orderId;
     private String inventoryId;
+    private String reason;
 }
