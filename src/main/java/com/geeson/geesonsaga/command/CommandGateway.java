@@ -13,7 +13,6 @@ import com.geeson.geesonsaga.support.UuidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.messaging.Message;
 import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Service;
 
@@ -34,10 +33,17 @@ public class CommandGateway {
         };
     }
 
-    public Action<OrderSagaState, OrderSagaEvent> inventoryFailureCompensateAction() {
+    public Action<OrderSagaState, OrderSagaEvent> inventoryFailurePaymentCompensateAction() {
         return context -> {
             String sagaId = context.getStateMachine().getId();
-            kafkaTemplate.send("ordersaga-inventory-compensate-request", sagaId);
+            kafkaTemplate.send("order-pay-inv-comp-req", sagaId);
+        };
+    }
+
+    public Action<OrderSagaState, OrderSagaEvent> inventoryFailureInventoryCompensateAction() {
+        return context -> {
+            String sagaId = context.getStateMachine().getId();
+            kafkaTemplate.send("order-inv-inv-comp-req", sagaId);
         };
     }
 

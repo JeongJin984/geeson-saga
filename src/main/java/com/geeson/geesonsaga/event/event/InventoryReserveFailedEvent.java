@@ -7,10 +7,10 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentFailedEvent {
+public class InventoryReserveFailedEvent {
     private String sagaId;
     private String stepId;
     private String orderId;
-    private String paymentId;
+    private String inventoryId;
     private String reason;
 }

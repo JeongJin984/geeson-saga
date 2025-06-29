@@ -1,16 +1,13 @@
 package com.geeson.geesonsaga.event.event;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
-@Data
-@NoArgsConstructor
+@Getter
 @AllArgsConstructor
-public class PaymentFailedEvent {
+public class InvInvCompFailEvent {
     private String sagaId;
     private String stepId;
     private String orderId;
-    private String paymentId;
-    private String reason;
+    private String inventoryId;
 }

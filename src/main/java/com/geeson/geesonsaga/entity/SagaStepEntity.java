@@ -62,6 +62,7 @@ public class SagaStepEntity {
         IN_PROGRESS,    // 실행 중
         DONE,           // 정상 완료
         FAILED,         // 실패
+        COMPENSATING,
         COMPENSATED     // 보상 완료 (보상 Step은 DONE 대신 COMPENSATED를 사용)
     }
 }

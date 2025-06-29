@@ -7,25 +7,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.statemachine.StateMachineContext;
-import org.springframework.statemachine.StateMachinePersist;
-import org.springframework.statemachine.action.Action;
 import org.springframework.statemachine.config.*;
 import org.springframework.statemachine.config.builders.StateMachineConfigurationConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineStateConfigurer;
 import org.springframework.statemachine.config.builders.StateMachineTransitionConfigurer;
-import org.springframework.statemachine.config.model.StateMachineModelFactory;
 import org.springframework.statemachine.listener.StateMachineListenerAdapter;
 import org.springframework.statemachine.persist.DefaultStateMachinePersister;
 import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.statemachine.state.State;
-import org.springframework.stereotype.Service;
+
 import static com.geeson.geesonsaga.enums.OrderSagaEvent.*;
 import static com.geeson.geesonsaga.enums.OrderSagaState.*;
 
 import java.util.EnumSet;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @EnableStateMachineFactory
@@ -69,7 +63,8 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
             .source(OrderSagaState.PAYMENT_COMPLETED)
             .target(OrderSagaState.COMPENSATING)
             .event(OrderSagaEvent.INVENTORY_FAILURE)
-            .action(commandGateway.inventoryFailureCompensateAction())
+            .action(commandGateway.inventoryFailurePaymentCompensateAction())
+            .action(commandGateway.inventoryFailureInventoryCompensateAction())
 
             .and()
             .withExternal()
