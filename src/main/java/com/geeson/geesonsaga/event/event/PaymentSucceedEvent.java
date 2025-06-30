@@ -9,6 +9,6 @@ public record PaymentSucceedEvent(
     String stepId,
     String orderId,
     String paymentId,
-    String reason
+    String message
 ) {
 }

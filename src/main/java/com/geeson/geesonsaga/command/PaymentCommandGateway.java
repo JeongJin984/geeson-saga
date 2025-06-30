@@ -2,6 +2,8 @@ package com.geeson.geesonsaga.command;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.command.payload.CommandPayload;
+import com.geeson.geesonsaga.command.payload.PayInvCompPayload;
 import com.geeson.geesonsaga.command.payload.PaymentRequestPayload;
 import com.geeson.geesonsaga.entity.OutboxEventEntity;
 import com.geeson.geesonsaga.entity.SagaInstanceEntity;
@@ -43,18 +45,17 @@ public class PaymentCommandGateway implements CommandGateway{
                 throw new IllegalStateException("Missing 'payment-request-payload' in message header");
             }
 
-            String stringPayload = serializePayload(payload);
             int executionOrder = sagaInstance.getSagaSteps().size();
 
-            saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", stringPayload, executionOrder);
+            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", payload, executionOrder);
 
-            kafkaTemplate.send("ord-pay-req-cmd", stringPayload)
+            kafkaTemplate.send("ord-pay-req-cmd", sagaStep.getCommand())
                 .whenComplete((result, ex) -> {
                     OutboxEventEntity.EventStatus status = (ex == null)
                         ? OutboxEventEntity.EventStatus.PUBLISHED
                         : OutboxEventEntity.EventStatus.FAILED;
 
-                    saveOutboxEvent("PaymentRequest", stringPayload, status);
+                    saveOutboxEvent("PaymentRequest", sagaStep.getCommand(), status);
                 });
         };
     }
@@ -72,18 +73,17 @@ public class PaymentCommandGateway implements CommandGateway{
                 .toList();
 
             for(String pid : paymentId) {
-                String stringPayload = pid;
                 int executionOrder = sagaInstance.getSagaSteps().size();
 
-                saveSagaStep(sagaInstance, "inventoryFailurePaymentCompensate", pid, "payment", stringPayload, executionOrder);
+                SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryFailurePaymentCompensate", pid, "payment", new PayInvCompPayload(pid), executionOrder);
 
-                kafkaTemplate.send("ord-pay-inv-comp-req", stringPayload)
+                kafkaTemplate.send("ord-pay-inv-comp-req", sagaStep.getCommand())
                     .whenComplete((result, ex) -> {
                         OutboxEventEntity.EventStatus status = (ex == null)
                             ? OutboxEventEntity.EventStatus.PUBLISHED
                             : OutboxEventEntity.EventStatus.FAILED;
 
-                        saveOutboxEvent("inventoryFailurePaymentCompensate", stringPayload, status);
+                        saveOutboxEvent("inventoryFailurePaymentCompensate", sagaStep.getCommand(), status);
                     });
             }
         };
@@ -102,8 +102,15 @@ public class PaymentCommandGateway implements CommandGateway{
         }
     }
 
-    private void saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, String command, int executionOrder) {
-        sagaStepJpaRepository.save(
+    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, CommandPayload command, int executionOrder) {
+        String stepId = String.valueOf(uuidGenerator.nextId());
+
+        command.setSagaId(sagaInstance.getId());
+        command.setStepId(stepId);
+
+        String stringPayload = serializePayload(command);
+
+        return sagaStepJpaRepository.save(
             SagaStepEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
                 .sagaInstance(sagaInstance)
@@ -113,13 +120,13 @@ public class PaymentCommandGateway implements CommandGateway{
                 .stepType(SagaStepEntity.StepType.FORWARD)
                 .status(SagaStepEntity.StepStatus.IN_PROGRESS)
                 .executionOrder(executionOrder)
-                .command(command)
+                .command(stringPayload)
                 .build()
         );
     }
 
-    private void saveOutboxEvent(String eventType, String payload, OutboxEventEntity.EventStatus status) {
-        outboxEventJpaRepository.save(
+    private OutboxEventEntity saveOutboxEvent(String eventType, String payload, OutboxEventEntity.EventStatus status) {
+        return outboxEventJpaRepository.save(
             OutboxEventEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
                 .aggregateType("payment")

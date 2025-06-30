@@ -1,20 +1,20 @@
 package com.geeson.geesonsaga.command.payload;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.*;
 
 import java.math.BigDecimal;
 
-@Data
-@AllArgsConstructor
+@Setter
+@Getter
 @NoArgsConstructor
-@Builder
-public class PaymentRequestPayload {
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class PaymentRequestPayload extends CommandPayload {
     private String orderId;
     private String userId;
     private String paymentId;
     private BigDecimal amount;
     private String paymentMethodId;
+    private String currency;
 }

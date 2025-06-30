@@ -11,6 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PayInvCompPayload extends CommandPayload {
-    private String paymentId;
+public abstract class CommandPayload {
+    private String sagaId;
+    private String stepId;
 }
