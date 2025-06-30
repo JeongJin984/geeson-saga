@@ -30,25 +30,25 @@ public class InvPayCompListener {
     private final SagaStepJpaRepository sagaStepJpaRepository;
     private final SagaInstanceJpaRepository sagaInstanceRepository;
 
-    @KafkaListener(topics = "order-pay-inv-comp-ok-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-pay-inv-comp-succ-evt", groupId = "order-saga")
     public void handleInvInvCompSuccessEvent(String message) {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
-            sagaStepJpaRepository.updateStatusByStepId(event.getStepId(), SagaStepEntity.StepStatus.COMPENSATED);
-            checkAndFinalizeSaga(event.getSagaId());
+            sagaStepJpaRepository.updateStatusByStepId(event.stepId(), SagaStepEntity.StepStatus.COMPENSATED);
+            checkAndFinalizeSaga(event.sagaId());
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    @KafkaListener(topics = "order-pay-inv-comp-fail-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-pay-inv-comp-fail-evt", groupId = "order-saga")
     public void handleInvInvCompFailEvent(String message) {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
-            sagaStepJpaRepository.updateStatusByStepId(event.getStepId(), SagaStepEntity.StepStatus.COMPENSATED);
-            checkAndFinalizeSaga(event.getSagaId());
+            sagaStepJpaRepository.updateStatusByStepId(event.stepId(), SagaStepEntity.StepStatus.COMPENSATED);
+            checkAndFinalizeSaga(event.sagaId());
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

@@ -1,9 +1,23 @@
 package com.geeson.geesonsaga.event.event;
 
-import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@Getter
-public class OrderCreatedEvent {
-    private String sagaId;
-    private Boolean restore;
+import java.math.BigDecimal;
+import java.util.List;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record OrderCreatedEvent (
+    String orderId,
+    String customerId,
+    String paymentMethodId,
+    String transactionId,
+    BigDecimal totalPrice,
+    String currency,
+    List<OrderItem> items
+) {
+    public record OrderItem(
+        String productId,
+        int quantity,
+        BigDecimal unitPrice
+    ) {}
 }

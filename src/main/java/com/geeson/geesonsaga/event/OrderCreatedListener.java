@@ -1,9 +1,11 @@
 package com.geeson.geesonsaga.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.command.payload.PaymentRequestPayload;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.OrderCreatedEvent;
+import com.geeson.geesonsaga.support.UuidGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -21,12 +23,13 @@ public class OrderCreatedListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
+    private final UuidGenerator uuidGenerator;
 
-    @KafkaListener(topics = "order-order-order-req-ok-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-ord-req-succ-event", groupId = "order-saga")
     public void handleOrderCreated(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         OrderCreatedEvent event = objectMapper.readValue(message, OrderCreatedEvent.class);
-        String sagaId = event.getSagaId();
+        String sagaId = String.valueOf(uuidGenerator.nextId());
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
@@ -43,7 +46,14 @@ public class OrderCreatedListener {
                 stateMachine
                     .sendEvent(
                         Mono.just(MessageBuilder
-                            .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
+                            .withPayload(OrderSagaEvent.START_ORDER)
+                            .setHeader("payload", new PaymentRequestPayload(
+                                event.orderId(),
+                                event.customerId(),
+                                String.valueOf(uuidGenerator.nextId()),
+                                event.totalPrice(),
+                                event.paymentMethodId()
+                            ))
                             .build()
                         )
                     )

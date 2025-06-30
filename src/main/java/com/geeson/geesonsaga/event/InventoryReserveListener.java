@@ -26,13 +26,12 @@ public class InventoryReserveListener {
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
     private final OutboxEventJpaRepository outboxEventJpaRepository;
-    private final UuidGenerator uuidGenerator;
 
-    @KafkaListener(topics = "order-inv-inv-req-ok-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-inv-dec-succ-evt", groupId = "order-saga")
     public void handleInventoryReserveSuccess(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
-        String sagaId = event.getSagaId();
+        String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
@@ -50,31 +49,29 @@ public class InventoryReserveListener {
     }
 
 
-    @KafkaListener(topics = "order-inv-inv-req-fail-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-inv-dec-fail-evt", groupId = "order-saga")
     public void handleInventoryReserveFailure(String message) throws Exception {
 
         InventoryReserveFailedEvent event = objectMapper.readValue(message, InventoryReserveFailedEvent.class);
 
-        outboxEventJpaRepository.save(new OutboxEventEntity(
-            String.valueOf(uuidGenerator.nextId()),
-            "inventory",
-            event.getInventoryId(),
-            OrderSagaEvent.INVENTORY_FAILURE,
-            objectMapper.writeValueAsString(event),
-            OutboxEventEntity.EventStatus.FAILED,
-            LocalDateTime.now(),
-            LocalDateTime.now()
-        ));
-
         // 1. Kafka 메시지 파싱
-        String sagaId = event.getSagaId();
+        String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
         // 3. Saga 상태 전이
         stateMachine
             .sendEvent(
-                Mono.just(MessageBuilder.withPayload(OrderSagaEvent.PAYMENT_FAILURE).build())
+                Mono.just(
+                    MessageBuilder
+                        .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
+                        .setHeader("sagaId", sagaId)
+                        .setHeader("stepId", event.stepId())
+                        .setHeader("orderId", event.orderId())
+                        .setHeader("inventoryId", event.inventoryId())
+                        .setHeader("reason", event.reason())
+                        .build()
+                )
             )
             .subscribe();
 

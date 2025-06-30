@@ -1,6 +1,5 @@
 package com.geeson.geesonsaga.entity;
 
-import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,9 +28,12 @@ public class OutboxEventEntity {
     @Column(name = "aggregate_id", nullable = false, length = 100)
     private String aggregateId;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false, length = 100)
-    private OrderSagaEvent eventType; // ex: PaymentRequested, InventoryRollback
+    private String eventType; // ex: PaymentRequested, InventoryRollback
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", columnDefinition = "varchar(20)", nullable = false, length = 20)
+    private MessageType messageType;
 
     @Column(columnDefinition = "json", nullable = false)
     private String payload;
@@ -52,4 +54,9 @@ public class OutboxEventEntity {
         PUBLISHED,
         FAILED
     }
+
+    public enum MessageType {
+        COMMAND, EVENT, REPLY, ERROR
+    }
+
 }

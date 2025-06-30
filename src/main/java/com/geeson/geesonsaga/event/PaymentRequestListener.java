@@ -20,11 +20,11 @@ public class PaymentRequestListener {
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
 
-    @KafkaListener(topics = "payment.request.success.event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-pay-req-succ-evt", groupId = "order-saga")
     public void handlePaymentSuccess(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
-        String sagaId = event.getSagaId();
+        String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
@@ -42,11 +42,11 @@ public class PaymentRequestListener {
     }
 
     // KafkaListener는 병렬성이 있는 경우 groupId 필수
-    @KafkaListener(topics = "payment.request.failure.event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-pay-req-fail-evt", groupId = "order-saga")
     public void handlePaymentFailure(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
-        String sagaId = event.getSagaId();
+        String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 

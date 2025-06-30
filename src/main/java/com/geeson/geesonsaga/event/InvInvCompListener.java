@@ -2,8 +2,10 @@ package com.geeson.geesonsaga.event;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.entity.OutboxEventEntity;
 import com.geeson.geesonsaga.entity.SagaInstanceEntity;
 import com.geeson.geesonsaga.entity.SagaStepEntity;
+import com.geeson.geesonsaga.entity.repository.OutboxEventJpaRepository;
 import com.geeson.geesonsaga.entity.repository.SagaInstanceJpaRepository;
 import com.geeson.geesonsaga.entity.repository.SagaStepJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
@@ -30,26 +32,27 @@ public class InvInvCompListener {
 
     private final SagaStepJpaRepository sagaStepJpaRepository;
     private final SagaInstanceJpaRepository sagaInstanceRepository;
+    private final OutboxEventJpaRepository outboxEventJpaRepository;
 
-    @KafkaListener(topics = "order-inv-inv-comp-ok-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-inv-inv-comp-succ-evt", groupId = "order-saga")
     public void handleInvInvCompSuccessEvent(String message) {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
-            sagaStepJpaRepository.updateStatusByStepId(event.getStepId(), SagaStepEntity.StepStatus.COMPENSATED);
-            checkAndFinalizeSaga(event.getSagaId());
+            sagaStepJpaRepository.updateStatusByStepId(event.stepId(), SagaStepEntity.StepStatus.COMPENSATED);
+            checkAndFinalizeSaga(event.sagaId());
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
 
-    @KafkaListener(topics = "order-inv-inv-comp-fail-event", groupId = "order-saga")
+    @KafkaListener(topics = "ord-inv-inv-comp-fail-evt", groupId = "order-saga")
     public void handleInvInvCompFailEvent(String message) {
         InvInvCompFailEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompFailEvent.class);
-            sagaStepJpaRepository.updateStatusByStepId(event.getStepId(), SagaStepEntity.StepStatus.COMPENSATED);
-            checkAndFinalizeSaga(event.getSagaId());
+            sagaStepJpaRepository.updateStatusByStepId(event.stepId(), SagaStepEntity.StepStatus.COMPENSATED);
+
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
@@ -70,9 +73,8 @@ public class InvInvCompListener {
             saga.setStatus(OrderSagaState.COMPENSATED);
             sagaInstanceRepository.save(saga);
 
-            // Optionally trigger statemachine event to move to COMPENSATED state
-            StateMachine<OrderSagaState, OrderSagaEvent> sm = stateMachineFactory.getStateMachine(sagaId);
-            sm
+            StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+            stateMachine
                 .sendEvent(Mono.just(MessageBuilder.withPayload(OrderSagaEvent.INVENTORY_COMPENSATED).build()))
                 .subscribe();
         }

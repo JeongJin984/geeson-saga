@@ -1,14 +1,16 @@
 package com.geeson.geesonsaga.event.event;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-@Getter
-@AllArgsConstructor
-public class InvInvCompFailEvent {
-    private String sagaId;
-    private String stepId;
-    private String orderId;
-    private String inventoryId;
-    private String reason;
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record InvInvCompFailEvent (
+    String eventId,
+    String sagaId,
+    String stepId,
+    String orderId,
+    String inventoryId,
+    String reason
+) {
 }

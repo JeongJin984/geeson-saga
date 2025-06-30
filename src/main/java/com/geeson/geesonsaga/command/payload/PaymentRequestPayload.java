@@ -1,4 +1,4 @@
-package com.geeson.geesonsaga.payload;
+package com.geeson.geesonsaga.command.payload;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 public class PaymentRequestPayload {
     private String orderId;
     private String userId;
+    private String paymentId;
     private BigDecimal amount;
-    private String paymentMethod;
+    private String paymentMethodId;
 }
