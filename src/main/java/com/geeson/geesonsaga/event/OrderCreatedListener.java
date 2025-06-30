@@ -2,6 +2,8 @@ package com.geeson.geesonsaga.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geeson.geesonsaga.command.payload.PaymentRequestPayload;
+import com.geeson.geesonsaga.entity.SagaInstanceEntity;
+import com.geeson.geesonsaga.entity.repository.SagaInstanceJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.OrderCreatedEvent;
@@ -16,6 +18,9 @@ import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -25,6 +30,8 @@ public class OrderCreatedListener {
     private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
     private final UuidGenerator uuidGenerator;
 
+    private final SagaInstanceJpaRepository sagaInstanceJpaRepository;
+
     @KafkaListener(topics = "ord-ord-req-succ-event", groupId = "order-saga")
     public void handleOrderCreated(String message) throws Exception {
         // 1. Kafka 메시지 파싱
@@ -32,6 +39,16 @@ public class OrderCreatedListener {
         String sagaId = String.valueOf(uuidGenerator.nextId());
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+
+        sagaInstanceJpaRepository.save(new SagaInstanceEntity(
+            sagaId,
+            "ORDER",
+            OrderSagaState.ORDER_CREATED,
+            message,
+            LocalDateTime.now(),
+            LocalDateTime.now(),
+            new ArrayList<>()
+        ));
 
         try {
             stateMachinePersister.restore(stateMachine, sagaId);

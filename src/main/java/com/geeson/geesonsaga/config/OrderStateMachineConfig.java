@@ -1,6 +1,7 @@
 package com.geeson.geesonsaga.config;
 
-import com.geeson.geesonsaga.command.CommandGateway;
+import com.geeson.geesonsaga.command.InventoryCommandGateway;
+import com.geeson.geesonsaga.command.PaymentCommandGateway;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import lombok.RequiredArgsConstructor;
@@ -19,15 +20,14 @@ import org.springframework.statemachine.state.State;
 import static com.geeson.geesonsaga.enums.OrderSagaEvent.*;
 import static com.geeson.geesonsaga.enums.OrderSagaState.*;
 
-import java.util.EnumSet;
-
 @Configuration
 @EnableStateMachineFactory
 @RequiredArgsConstructor
 public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<OrderSagaState, OrderSagaEvent> {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
-    private final CommandGateway commandGateway;
+    private final PaymentCommandGateway paymentCommandGatewayGW;
+    private final InventoryCommandGateway inventoryCommandGateway;
 
     @Override
     public void configure(StateMachineStateConfigurer<OrderSagaState, OrderSagaEvent> states) throws Exception {
@@ -47,14 +47,14 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
             .source(ORDER_CREATED)
             .event(START_ORDER)
             .target(PAYMENT_REQUESTED)
-            .action(commandGateway.paymentRequestCommand())
+            .action(paymentCommandGatewayGW.paymentRequestCommand())
 
             .and()
             .withExternal()
             .source(PAYMENT_REQUESTED)
             .event(PAYMENT_SUCCESS)
             .target(PAYMENT_COMPLETED)
-            .action(commandGateway.inventoryReserveRequest())
+            .action(inventoryCommandGateway.inventoryReserveCommand())
 
             .and()
             .withExternal()
@@ -73,14 +73,14 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
             .source(PAYMENT_COMPLETED)
             .event(INVENTORY_FAILURE)
             .target(COMPENSATING_PAYMENT)
-            .action(commandGateway.inventoryFailurePaymentCompensateAction())
+            .action(paymentCommandGatewayGW.inventoryFailurePaymentCompensateCommand())
 
             .and()
             .withExternal()
             .source(COMPENSATING_PAYMENT)
             .event(PAYMENT_COMPENSATED)
             .target(COMPENSATING_INVENTORY)
-            .action(commandGateway.inventoryFailureInventoryCompensateAction())
+            .action(inventoryCommandGateway.inventoryFailureInventoryCompensateCommand())
 
             .and()
             .withExternal()
@@ -93,14 +93,14 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
             .source(COMPENSATING_PAYMENT)
             .event(PAYMENT_COMPENSATE_FAIL)
             .target(FAILED)
-            .action(commandGateway.paymentInventoryCompensateFailDLQ())
+            .action(paymentCommandGatewayGW.paymentInventoryCompensateFailDLQ())
 
             .and()
             .withExternal()
             .source(COMPENSATING_INVENTORY)
             .event(INVENTORY_COMPENSATE_FAIL)
             .target(FAILED)
-            .action(commandGateway.inventoryCompensateFailDLQ())
+            .action(inventoryCommandGateway.inventoryInventoryCompensateFailDLQ())
 
             .and()
             .withExternal()
