@@ -70,7 +70,8 @@ public class OrderCreatedListener {
                                 event.customerId(),
                                 String.valueOf(uuidGenerator.nextId()),
                                 event.totalPrice(),
-                                event.paymentMethodId()
+                                event.paymentMethodId(),
+                                event.currency()
                             ))
                             .build()
                         )
