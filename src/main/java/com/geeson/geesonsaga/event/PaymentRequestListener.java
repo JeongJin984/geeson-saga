@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.PaymentFailedEvent;
+import com.geeson.geesonsaga.event.event.PaymentSucceedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.support.MessageBuilder;
@@ -23,7 +24,7 @@ public class PaymentRequestListener {
     @KafkaListener(topics = "ord-pay-req-succ-evt", groupId = "order-saga")
     public void handlePaymentSuccess(String message) throws Exception {
         // 1. Kafka 메시지 파싱
-        PaymentFailedEvent event = objectMapper.readValue(message, PaymentFailedEvent.class);
+        PaymentSucceedEvent event = objectMapper.readValue(message, PaymentSucceedEvent.class);
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
