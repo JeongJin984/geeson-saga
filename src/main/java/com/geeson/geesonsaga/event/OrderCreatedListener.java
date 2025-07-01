@@ -64,6 +64,7 @@ public class OrderCreatedListener {
                     .sendEvent(
                         Mono.just(MessageBuilder
                             .withPayload(OrderSagaEvent.START_ORDER)
+                            .setHeader("sagaId", sagaId)
                             .setHeader("payload", new PaymentRequestPayload(
                                 event.orderId(),
                                 event.customerId(),

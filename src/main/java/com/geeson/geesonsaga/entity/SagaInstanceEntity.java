@@ -42,7 +42,7 @@ public class SagaInstanceEntity {
     @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "sagaInstance")
+    @OneToMany(mappedBy = "sagaInstance", fetch = FetchType.LAZY)
     private List<SagaStepEntity> sagaSteps = new ArrayList<>();
 
     public void updateStatus(final OrderSagaState newStatus) {

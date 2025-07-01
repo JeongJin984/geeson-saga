@@ -17,6 +17,8 @@ import org.springframework.statemachine.persist.DefaultStateMachinePersister;
 import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.statemachine.state.State;
 
+import java.util.EnumSet;
+
 import static com.geeson.geesonsaga.enums.OrderSagaEvent.*;
 import static com.geeson.geesonsaga.enums.OrderSagaState.*;
 
@@ -34,6 +36,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
         states
             .withStates()
             .initial(ORDER_CREATED)
+            .states(EnumSet.allOf(OrderSagaState.class))
             .end(ORDER_COMPLETED)
             .end(FAILED)
             .end(COMPENSATED)

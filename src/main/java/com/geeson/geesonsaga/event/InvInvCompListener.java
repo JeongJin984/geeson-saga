@@ -67,7 +67,7 @@ public class InvInvCompListener {
             .allMatch(step -> step.getStatus() == SagaStepEntity.StepStatus.COMPENSATED);
 
         if (allSuccess) {
-            SagaInstanceEntity saga = sagaInstanceRepository.findById(sagaId)
+            SagaInstanceEntity saga = sagaInstanceRepository.findByIdWithStepsOrdered(sagaId)
                 .orElseThrow(() -> new IllegalStateException("Saga not found"));
 
             saga.setStatus(OrderSagaState.COMPENSATED);
@@ -75,7 +75,11 @@ public class InvInvCompListener {
 
             StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
             stateMachine
-                .sendEvent(Mono.just(MessageBuilder.withPayload(OrderSagaEvent.INVENTORY_COMPENSATED).build()))
+                .sendEvent(Mono.just(MessageBuilder
+                    .withPayload(OrderSagaEvent.INVENTORY_COMPENSATED)
+                    .setHeader("sagaId", sagaId)
+                    .build()
+                ))
                 .subscribe();
         }
     }

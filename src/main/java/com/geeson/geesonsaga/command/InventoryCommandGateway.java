@@ -12,15 +12,20 @@ import com.geeson.geesonsaga.entity.repository.SagaStepJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.support.UuidGenerator;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.statemachine.StateContext;
 import org.springframework.statemachine.action.Action;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class InventoryCommandGateway implements CommandGateway {
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -32,10 +37,10 @@ public class InventoryCommandGateway implements CommandGateway {
 
     public Action<OrderSagaState, OrderSagaEvent> inventoryReserveCommand() {
         return context -> {
-            String sagaId = context.getStateMachine().getId();
+            final String sagaId = getSagaId(context);
             String inventoryId = String.valueOf(uuidGenerator.nextId());
 
-            SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findById(sagaId)
+            SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findByIdWithStepsOrdered(sagaId)
                 .orElseThrow(() -> new IllegalStateException("No saga instance found for sagaId: " + sagaId));
 
             InventoryReservePayload payload = (InventoryReservePayload) context.getMessageHeader("payload");
@@ -44,28 +49,26 @@ public class InventoryCommandGateway implements CommandGateway {
             }
 
             String stringPayload =  serializePayload(payload);
-            int executionOrder = sagaInstance.getSagaSteps().size();
+            int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
             saveSagaStep(sagaInstance, "inventoryReserve", inventoryId, "inventory", stringPayload, executionOrder);
-
-            kafkaTemplate.send("ord-pay-req-cmd", stringPayload)
+            OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryReserve", inventoryId, stringPayload, OutboxEventEntity.EventStatus.PENDING);
+            kafkaTemplate.send("ord-inv-dec-cmd", stringPayload)
                 .whenComplete((result, ex) -> {
-                    OutboxEventEntity.EventStatus status = (ex == null)
-                        ? OutboxEventEntity.EventStatus.PUBLISHED
-                        : OutboxEventEntity.EventStatus.FAILED;
-
-                    saveOutboxEvent("PaymentRequest", stringPayload, status);
+                    if (ex == null) {
+                        outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
+                    } else {
+                        outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.FAILED.name(), LocalDateTime.now());
+                    }
                 });
-
-            kafkaTemplate.send("ord-inv-dec-cmd", sagaId);
         };
     }
 
     public Action<OrderSagaState, OrderSagaEvent> inventoryFailureInventoryCompensateCommand() {
         return context -> {
-            String sagaId = context.getStateMachine().getId();
+            final String sagaId = getSagaId(context);
 
-            SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findById(sagaId)
+            SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findByIdWithStepsOrdered(sagaId)
                 .orElseThrow(() -> new IllegalStateException("No saga instance found for sagaId: " + sagaId));
 
             List<String> inventoryId = sagaInstance.getSagaSteps().stream()
@@ -75,17 +78,17 @@ public class InventoryCommandGateway implements CommandGateway {
 
             for(String iid : inventoryId) {
                 String stringPayload = iid;
-                int executionOrder = sagaInstance.getSagaSteps().size();
+                int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
                 saveSagaStep(sagaInstance, "inventoryFailureInventoryCompensate", iid, "inventory", stringPayload, executionOrder);
-
+                OutboxEventEntity outboxEvent = saveOutboxEvent("InventoryFailureInventoryCompensate", iid, stringPayload, OutboxEventEntity.EventStatus.PENDING);
                 kafkaTemplate.send("ord-inv-inv-comp-req", stringPayload)
                     .whenComplete((result, ex) -> {
-                        OutboxEventEntity.EventStatus status = (ex == null)
-                            ? OutboxEventEntity.EventStatus.PUBLISHED
-                            : OutboxEventEntity.EventStatus.FAILED;
-
-                        saveOutboxEvent("inventoryFailureInventoryCompensate", stringPayload, status);
+                        if (ex == null) {
+                            outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
+                        } else {
+                            outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.FAILED.name(), LocalDateTime.now());
+                        }
                     });
             }
         };
@@ -93,6 +96,14 @@ public class InventoryCommandGateway implements CommandGateway {
 
     public Action<OrderSagaState, OrderSagaEvent> inventoryInventoryCompensateFailDLQ() {
         return context -> {};
+    }
+
+    private String getSagaId(StateContext<OrderSagaState, OrderSagaEvent> context) {
+        String sagaId = context.getStateMachine().getId();
+        if(!hasText(sagaId)) {
+            sagaId = context.getMessageHeader("sagaId").toString();
+        }
+        return sagaId;
     }
 
     private String serializePayload(Object payload) {
@@ -103,8 +114,8 @@ public class InventoryCommandGateway implements CommandGateway {
         }
     }
 
-    private void saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, String command, int executionOrder) {
-        sagaStepJpaRepository.save(
+    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, String command, int executionOrder) {
+        return sagaStepJpaRepository.save(
             SagaStepEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
                 .sagaInstance(sagaInstance)
@@ -119,10 +130,11 @@ public class InventoryCommandGateway implements CommandGateway {
         );
     }
 
-    private void saveOutboxEvent(String eventType, String payload, OutboxEventEntity.EventStatus status) {
-        outboxEventJpaRepository.save(
+    private OutboxEventEntity saveOutboxEvent(String eventType, String aggregateId, String payload, OutboxEventEntity.EventStatus status) {
+        return outboxEventJpaRepository.save(
             OutboxEventEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
+                .aggregateId(aggregateId)
                 .aggregateType("payment")
                 .eventType(eventType)
                 .messageType(OutboxEventEntity.MessageType.COMMAND)

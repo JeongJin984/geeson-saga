@@ -38,7 +38,11 @@ public class InventoryReserveListener {
         // 3. Saga 상태 전이
         stateMachine
             .sendEvent(
-                Mono.just(MessageBuilder.withPayload(OrderSagaEvent.PAYMENT_FAILURE).build())
+                Mono.just(MessageBuilder
+                    .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
+                    .setHeader("sagaId", sagaId)
+                    .build()
+                )
             )
             .subscribe();
 
