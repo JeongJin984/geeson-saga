@@ -36,13 +36,7 @@ public class InventoryReserveListener {
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-
-        try {
-            stateMachinePersister.restore(stateMachine, sagaId);
-        } catch (Exception ignore) {
-            log.info("restore state machine failed for sagaId: " + sagaId);
-            throw new RuntimeException("StateMachine restore failed", ignore);
-        }
+        stateMachinePersister.restore(stateMachine, sagaId);
 
         // 3. Saga 상태 전이
         stateMachine.sendEvent(
@@ -73,13 +67,7 @@ public class InventoryReserveListener {
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-
-        try {
-            stateMachinePersister.restore(stateMachine, sagaId);
-        } catch (Exception ignore) {
-            log.info("restore state machine failed for sagaId: " + sagaId);
-            throw new RuntimeException("StateMachine restore failed", ignore);
-        }
+        stateMachinePersister.restore(stateMachine, sagaId);
 
         // 3. Saga 상태 전이
         stateMachine.sendEvent(
@@ -101,9 +89,6 @@ public class InventoryReserveListener {
                 }
             })
             .subscribe();
-
-        // 4. 상태 저장
-        stateMachinePersister.persist(stateMachine, sagaId);
 
         System.out.println("Inventory reservation failed for sagaId: " + sagaId);
     }

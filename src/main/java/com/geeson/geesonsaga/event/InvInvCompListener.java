@@ -37,7 +37,7 @@ public class InvInvCompListener {
     private final OutboxEventJpaRepository outboxEventJpaRepository;
 
     @KafkaListener(topics = "ord-inv-inv-comp-succ-evt", groupId = "order-saga")
-    public void handleInvInvCompSuccessEvent(String message) {
+    public void handleInvInvCompSuccessEvent(String message) throws Exception {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
@@ -61,7 +61,7 @@ public class InvInvCompListener {
 
     }
 
-    private void checkAndFinalizeSaga(String sagaId) {
+    private void checkAndFinalizeSaga(String sagaId) throws Exception {
         List<SagaStepEntity> compensateSteps = sagaStepJpaRepository
             .findBySagaInstanceIdAndStepType(sagaId, SagaStepEntity.StepType.COMPENSATION);
 
@@ -76,6 +76,7 @@ public class InvInvCompListener {
             sagaInstanceRepository.save(saga);
 
             StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+            stateMachinePersister.restore(stateMachine, sagaId);
 
             stateMachine.sendEvent(Mono.just(MessageBuilder
                     .withPayload(OrderSagaEvent.INVENTORY_COMPENSATED)

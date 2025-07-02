@@ -133,7 +133,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
     @Bean
     public StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister(
         JpaPersistingStateMachinePersist persist) {
-        return new DefaultStateMachinePersister<>(persist);
+        return new CustomStateMachinePersister(persist);
     }
 
 }

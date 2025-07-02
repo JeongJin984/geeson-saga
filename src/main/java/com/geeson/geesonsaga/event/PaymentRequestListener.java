@@ -1,6 +1,7 @@
 package com.geeson.geesonsaga.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.config.CustomStateMachinePersister;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.PaymentFailedEvent;
@@ -21,7 +22,7 @@ import reactor.core.publisher.Mono;
 public class PaymentRequestListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
-    private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
+    private final CustomStateMachinePersister stateMachinePersister;
 
     @KafkaListener(topics = "ord-pay-req-succ-evt", groupId = "order-saga")
     public void handlePaymentSuccess(String message) throws Exception {
@@ -30,27 +31,23 @@ public class PaymentRequestListener {
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-        StateMachine<OrderSagaState, OrderSagaEvent> restoredSateMachine = stateMachinePersister.restore(stateMachine, sagaId);
+        stateMachinePersister.restore(stateMachine, sagaId);
+
         // 3. Saga 상태 전이
-        restoredSateMachine.sendEvent(
+        stateMachine.sendEvent(
                 Mono.just(MessageBuilder
                     .withPayload(OrderSagaEvent.PAYMENT_SUCCESS)
                     .setHeader("sagaId", sagaId)
                     .build()
                 )
-            )
-            .doOnComplete(() -> {
+            ).doOnComplete(() -> {
                 try {
-                    // 4. 상태 저장
                     stateMachinePersister.persist(stateMachine, sagaId);
-                }catch (Exception e) {
-                    throw new RuntimeException("StateMachine persist failed", e);
+                } catch (Exception e) {
+                    log.error("Error persisting state machine {}", sagaId, e);
                 }
             })
             .subscribe();
-
-
-        System.out.println("Payment success for sagaId: " + sagaId);
     }
 
     // KafkaListener는 병렬성이 있는 경우 groupId 필수
@@ -61,13 +58,7 @@ public class PaymentRequestListener {
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-
-        try {
-            stateMachinePersister.restore(stateMachine, sagaId);
-        } catch (Exception ignore) {
-            log.info("restore state machine failed for sagaId: " + sagaId);
-            throw new RuntimeException("StateMachine restore failed", ignore);
-        }
+        stateMachinePersister.restore(stateMachine, sagaId);
 
         // 3. Saga 상태 전이
         stateMachine.sendEvent(

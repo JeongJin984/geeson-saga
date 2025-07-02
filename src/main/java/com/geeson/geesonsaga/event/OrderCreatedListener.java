@@ -2,6 +2,7 @@ package com.geeson.geesonsaga.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geeson.geesonsaga.command.payload.PaymentRequestPayload;
+import com.geeson.geesonsaga.config.CustomStateMachinePersister;
 import com.geeson.geesonsaga.entity.SagaInstanceEntity;
 import com.geeson.geesonsaga.entity.repository.SagaInstanceJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
@@ -20,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Optional;
 
 @Component
 @Slf4j
@@ -27,7 +29,7 @@ import java.util.ArrayList;
 public class OrderCreatedListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
-    private final StateMachinePersister<OrderSagaState, OrderSagaEvent, String> stateMachinePersister;
+    private final CustomStateMachinePersister stateMachinePersister;
     private final UuidGenerator uuidGenerator;
 
     private final SagaInstanceJpaRepository sagaInstanceJpaRepository;
@@ -39,29 +41,28 @@ public class OrderCreatedListener {
         final String sagaId = String.valueOf(uuidGenerator.nextId());
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+        Optional<SagaInstanceEntity> sagaInstance = sagaInstanceJpaRepository.findByIdWithStepsOrdered(sagaId);
 
-        SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.save(new SagaInstanceEntity(
-            sagaId,
-            "ORDER",
-            OrderSagaState.ORDER_CREATED,
-            message,
-            LocalDateTime.now(),
-            LocalDateTime.now(),
-            new ArrayList<>()
-        ));
+        if(sagaInstance.isPresent()) {
+            stateMachinePersister.restore(stateMachine, sagaId);
 
-//        try {
-//            stateMachinePersister.restore(stateMachine, sagaId);
-//        } catch (Exception ignore) {
-//            log.info("restore state machine failed for sagaId: " + sagaId);
-//        }
+            // TODO : 복구 로직 필요함
+        } else {
+            sagaInstance = Optional.of(sagaInstanceJpaRepository.save(new SagaInstanceEntity(
+                sagaId,
+                "ORDER",
+                OrderSagaState.ORDER_CREATED,
+                message,
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                new ArrayList<>()
+            )));
 
-        // 3. Saga 상태 전이
-        stateMachine
-            .startReactively()
-            .thenMany(
-                stateMachine
-                    .sendEvent(
+            // 3. Saga 상태 전이
+            stateMachine
+                .startReactively()
+                .thenMany(
+                    stateMachine.sendEvent(
                         Mono.just(MessageBuilder
                             .withPayload(OrderSagaEvent.START_ORDER)
                             .setHeader("sagaId", sagaId)
@@ -76,14 +77,16 @@ public class OrderCreatedListener {
                             .build()
                         )
                     )
-            )
-            .doOnComplete(() -> {
-                try {
-                    stateMachinePersister.persist(stateMachine, sagaId);
-                }catch (Exception e) {
-                    throw new RuntimeException("StateMachine persist failed", e);
-                }
-            })
-            .subscribe();
+                ).doOnComplete(() -> {
+                    try {
+                        stateMachinePersister.persist(stateMachine, sagaId);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .blockLast();
+        }
+
+
     }
 }

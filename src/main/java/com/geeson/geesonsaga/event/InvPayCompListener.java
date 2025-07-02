@@ -33,7 +33,7 @@ public class InvPayCompListener {
     private final SagaInstanceJpaRepository sagaInstanceRepository;
 
     @KafkaListener(topics = "ord-pay-inv-comp-succ-evt", groupId = "order-saga")
-    public void handleInvInvCompSuccessEvent(String message) {
+    public void handleInvInvCompSuccessEvent(String message) throws Exception {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
@@ -45,7 +45,7 @@ public class InvPayCompListener {
     }
 
     @KafkaListener(topics = "ord-pay-inv-comp-fail-evt", groupId = "order-saga")
-    public void handleInvInvCompFailEvent(String message) {
+    public void handleInvInvCompFailEvent(String message) throws Exception {
         InvInvCompSuccessEvent event = null;
         try {
             event = objectMapper.readValue(message, InvInvCompSuccessEvent.class);
@@ -57,7 +57,7 @@ public class InvPayCompListener {
 
     }
 
-    private void checkAndFinalizeSaga(String sagaId) {
+    private void checkAndFinalizeSaga(String sagaId) throws Exception {
         List<SagaStepEntity> compensateSteps = sagaStepJpaRepository
             .findBySagaInstanceIdAndStepType(sagaId, SagaStepEntity.StepType.COMPENSATION);
 
@@ -73,6 +73,7 @@ public class InvPayCompListener {
 
             // Optionally trigger statemachine event to move to COMPENSATED state
             StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+            stateMachinePersister.restore(stateMachine, sagaId);
 
             try {
                 stateMachinePersister.restore(stateMachine, sagaId);

@@ -13,6 +13,7 @@ import com.geeson.geesonsaga.entity.repository.SagaInstanceJpaRepository;
 import com.geeson.geesonsaga.entity.repository.SagaStepJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
+import com.geeson.geesonsaga.event.event.OrderCreatedEvent;
 import com.geeson.geesonsaga.support.UuidGenerator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -40,28 +41,38 @@ public class InventoryCommandGateway implements CommandGateway {
     public Action<OrderSagaState, OrderSagaEvent> inventoryReserveCommand() {
         return context -> {
             final String sagaId = getSagaId(context);
-            String inventoryId = String.valueOf(uuidGenerator.nextId());
 
             SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findByIdWithStepsOrdered(sagaId)
                 .orElseThrow(() -> new IllegalStateException("No saga instance found for sagaId: " + sagaId));
 
-            InventoryReservePayload payload = (InventoryReservePayload) context.getMessageHeader("payload");
-            if (payload == null) {
-                throw new IllegalStateException("Missing 'inventory-reserve-payload' in message header");
+            OrderCreatedEvent request;
+            try {
+                request = mapper.readValue(sagaInstance.getContext(), OrderCreatedEvent.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
             }
 
             int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
+            for(OrderCreatedEvent.OrderItem item : request.items()) {
+                String inventoryId = String.valueOf(uuidGenerator.nextId());
 
-            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryReserve", inventoryId, "inventory", payload, executionOrder);
-            OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryReserve", inventoryId, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
-            kafkaTemplate.send("ord-inv-dec-cmd", sagaStep.getCommand())
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
-                    } else {
-                        outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.FAILED.name(), LocalDateTime.now());
-                    }
-                });
+                InventoryReservePayload payload = new InventoryReservePayload(
+                    request.customerId(),
+                    item.productId(),
+                    item.quantity()
+                );
+
+                SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryReserve", inventoryId, "inventory", payload, executionOrder++);
+                OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryReserve", inventoryId, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
+                kafkaTemplate.send("ord-inv-dec-cmd", sagaStep.getCommand())
+                    .whenComplete((result, ex) -> {
+                        if (ex == null) {
+                            outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
+                        } else {
+                            outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.FAILED.name(), LocalDateTime.now());
+                        }
+                    });
+            }
         };
     }
 

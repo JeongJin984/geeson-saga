@@ -13,6 +13,7 @@ import com.geeson.geesonsaga.entity.repository.SagaInstanceJpaRepository;
 import com.geeson.geesonsaga.entity.repository.SagaStepJpaRepository;
 import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
+import com.geeson.geesonsaga.event.event.OrderCreatedEvent;
 import com.geeson.geesonsaga.support.UuidGenerator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -45,14 +46,25 @@ public class PaymentCommandGateway implements CommandGateway{
             SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.findByIdWithStepsOrdered(sagaId)
                 .orElseThrow(() -> new IllegalStateException("No saga instance found for sagaId: " + sagaId));
 
-            PaymentRequestPayload payload = (PaymentRequestPayload) context.getMessageHeader("payload");
-            if (payload == null) {
-                throw new IllegalStateException("Missing 'payment-request-payload' in message header");
+            OrderCreatedEvent request = null;
+            try {
+                request = mapper.readValue(sagaInstance.getContext(), OrderCreatedEvent.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
             }
+
+            PaymentRequestPayload paymentRequestPayload = new PaymentRequestPayload(
+                request.orderId(),
+                request.customerId(),
+                String.valueOf(uuidGenerator.nextId()),
+                request.totalPrice(),
+                request.paymentMethodId(),
+                request.currency()
+            );
 
             int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
-            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", payload, executionOrder);
+            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", paymentRequestPayload, executionOrder);
             OutboxEventEntity outboxEvent = saveOutboxEvent("PaymentRequest", paymentId, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
             kafkaTemplate.send("ord-pay-req-cmd", sagaStep.getCommand())
                 .whenComplete((result, ex) -> {
