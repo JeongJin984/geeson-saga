@@ -6,6 +6,7 @@ import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.PaymentFailedEvent;
 import com.geeson.geesonsaga.event.event.PaymentSucceedEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
@@ -14,6 +15,7 @@ import org.springframework.statemachine.persist.StateMachinePersister;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class PaymentRequestListener {
@@ -28,16 +30,25 @@ public class PaymentRequestListener {
         String sagaId = event.sagaId();
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-
+        StateMachine<OrderSagaState, OrderSagaEvent> restoredSateMachine = stateMachinePersister.restore(stateMachine, sagaId);
         // 3. Saga 상태 전이
-        stateMachine
-            .sendEvent(
-                Mono.just(MessageBuilder.withPayload(OrderSagaEvent.PAYMENT_FAILURE).build())
+        restoredSateMachine.sendEvent(
+                Mono.just(MessageBuilder
+                    .withPayload(OrderSagaEvent.PAYMENT_SUCCESS)
+                    .setHeader("sagaId", sagaId)
+                    .build()
+                )
             )
+            .doOnComplete(() -> {
+                try {
+                    // 4. 상태 저장
+                    stateMachinePersister.persist(stateMachine, sagaId);
+                }catch (Exception e) {
+                    throw new RuntimeException("StateMachine persist failed", e);
+                }
+            })
             .subscribe();
 
-        // 4. 상태 저장
-        stateMachinePersister.persist(stateMachine, sagaId);
 
         System.out.println("Payment success for sagaId: " + sagaId);
     }
@@ -51,15 +62,29 @@ public class PaymentRequestListener {
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
-        // 3. Saga 상태 전이
-        stateMachine
-            .sendEvent(
-                Mono.just(MessageBuilder.withPayload(OrderSagaEvent.PAYMENT_FAILURE).build())
-            )
-            .subscribe();
+        try {
+            stateMachinePersister.restore(stateMachine, sagaId);
+        } catch (Exception ignore) {
+            log.info("restore state machine failed for sagaId: " + sagaId);
+            throw new RuntimeException("StateMachine restore failed", ignore);
+        }
 
-        // 4. 상태 저장
-        stateMachinePersister.persist(stateMachine, sagaId);
+        // 3. Saga 상태 전이
+        stateMachine.sendEvent(
+                Mono.just(MessageBuilder
+                    .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
+                    .setHeader("sagaId", sagaId)
+                    .build()
+                )
+            ).doOnComplete(() -> {
+                try {
+                    // 4. 상태 저장
+                    stateMachinePersister.persist(stateMachine, sagaId);
+                }catch (Exception e) {
+                    throw new RuntimeException("StateMachine persist failed", e);
+                }
+            })
+            .subscribe();
 
         // 5. 실패 알림 및 보상 트랜잭션 트리거 등 후처리 가능
         System.out.println("Payment failed for sagaId: " + sagaId + ". Saga transitioned to FAILED.");

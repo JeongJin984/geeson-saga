@@ -2,6 +2,8 @@ package com.geeson.geesonsaga.command;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.command.payload.CommandPayload;
+import com.geeson.geesonsaga.command.payload.InvInvCompPayload;
 import com.geeson.geesonsaga.command.payload.InventoryReservePayload;
 import com.geeson.geesonsaga.entity.OutboxEventEntity;
 import com.geeson.geesonsaga.entity.SagaInstanceEntity;
@@ -48,12 +50,11 @@ public class InventoryCommandGateway implements CommandGateway {
                 throw new IllegalStateException("Missing 'inventory-reserve-payload' in message header");
             }
 
-            String stringPayload =  serializePayload(payload);
             int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
-            saveSagaStep(sagaInstance, "inventoryReserve", inventoryId, "inventory", stringPayload, executionOrder);
-            OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryReserve", inventoryId, stringPayload, OutboxEventEntity.EventStatus.PENDING);
-            kafkaTemplate.send("ord-inv-dec-cmd", stringPayload)
+            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryReserve", inventoryId, "inventory", payload, executionOrder);
+            OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryReserve", inventoryId, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
+            kafkaTemplate.send("ord-inv-dec-cmd", sagaStep.getCommand())
                 .whenComplete((result, ex) -> {
                     if (ex == null) {
                         outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
@@ -77,12 +78,12 @@ public class InventoryCommandGateway implements CommandGateway {
                 .toList();
 
             for(String iid : inventoryId) {
-                String stringPayload = iid;
+                InvInvCompPayload payload = new InvInvCompPayload(iid);
                 int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
-                saveSagaStep(sagaInstance, "inventoryFailureInventoryCompensate", iid, "inventory", stringPayload, executionOrder);
-                OutboxEventEntity outboxEvent = saveOutboxEvent("InventoryFailureInventoryCompensate", iid, stringPayload, OutboxEventEntity.EventStatus.PENDING);
-                kafkaTemplate.send("ord-inv-inv-comp-req", stringPayload)
+                SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryFailureInventoryCompensate", iid, "inventory", payload, executionOrder);
+                OutboxEventEntity outboxEvent = saveOutboxEvent("InventoryFailureInventoryCompensate", iid, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
+                kafkaTemplate.send("ord-inv-inv-comp-req", sagaStep.getCommand())
                     .whenComplete((result, ex) -> {
                         if (ex == null) {
                             outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
@@ -114,7 +115,12 @@ public class InventoryCommandGateway implements CommandGateway {
         }
     }
 
-    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, String command, int executionOrder) {
+    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, CommandPayload command, int executionOrder) {
+        command.setSagaId(sagaInstance.getId());
+        command.setStepId(String.valueOf(uuidGenerator.nextId()));
+
+        String stringCommand = serializePayload(command);
+
         return sagaStepJpaRepository.save(
             SagaStepEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
@@ -125,7 +131,7 @@ public class InventoryCommandGateway implements CommandGateway {
                 .stepType(SagaStepEntity.StepType.FORWARD)
                 .status(SagaStepEntity.StepStatus.IN_PROGRESS)
                 .executionOrder(executionOrder)
-                .command(command)
+                .command(stringCommand)
                 .build()
         );
     }

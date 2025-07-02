@@ -2,6 +2,8 @@ package com.geeson.geesonsaga.command;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.geeson.geesonsaga.command.payload.CommandPayload;
+import com.geeson.geesonsaga.command.payload.PayInvCompPayload;
 import com.geeson.geesonsaga.command.payload.PaymentRequestPayload;
 import com.geeson.geesonsaga.entity.OutboxEventEntity;
 import com.geeson.geesonsaga.entity.SagaInstanceEntity;
@@ -48,13 +50,11 @@ public class PaymentCommandGateway implements CommandGateway{
                 throw new IllegalStateException("Missing 'payment-request-payload' in message header");
             }
 
-            String stringPayload = serializePayload(payload);
             int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
-            saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", stringPayload, executionOrder);
-
-            OutboxEventEntity outboxEvent = saveOutboxEvent("PaymentRequest", paymentId, stringPayload, OutboxEventEntity.EventStatus.PENDING);
-            kafkaTemplate.send("ord-pay-req-cmd", stringPayload)
+            SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "paymentRequestCommand", paymentId, "payment", payload, executionOrder);
+            OutboxEventEntity outboxEvent = saveOutboxEvent("PaymentRequest", paymentId, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
+            kafkaTemplate.send("ord-pay-req-cmd", sagaStep.getCommand())
                 .whenComplete((result, ex) -> {
                     if (ex == null) {
                         outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
@@ -78,12 +78,12 @@ public class PaymentCommandGateway implements CommandGateway{
                 .toList();
 
             for(String pid : paymentId) {
-                String stringPayload = pid;
+                PayInvCompPayload payload = new PayInvCompPayload(pid);
                 int executionOrder = sagaInstance.getSagaSteps() == null ? 1 : sagaInstance.getSagaSteps().size();
 
-                saveSagaStep(sagaInstance, "inventoryFailurePaymentCompensate", pid, "payment", stringPayload, executionOrder);
-                OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryFailurePaymentCompensate", pid, stringPayload, OutboxEventEntity.EventStatus.PENDING);
-                kafkaTemplate.send("ord-pay-inv-comp-req", stringPayload)
+                SagaStepEntity sagaStep = saveSagaStep(sagaInstance, "inventoryFailurePaymentCompensate", pid, "payment", payload, executionOrder);
+                OutboxEventEntity outboxEvent = saveOutboxEvent("inventoryFailurePaymentCompensate", pid, sagaStep.getCommand(), OutboxEventEntity.EventStatus.PENDING);
+                kafkaTemplate.send("ord-pay-inv-comp-req", sagaStep.getCommand())
                     .whenComplete((result, ex) -> {
                         if (ex == null) {
                             outboxEventJpaRepository.updateStatusNative(outboxEvent.getId(), OutboxEventEntity.EventStatus.PUBLISHED.name(), LocalDateTime.now());
@@ -115,7 +115,12 @@ public class PaymentCommandGateway implements CommandGateway{
         }
     }
 
-    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, String command, int executionOrder) {
+    private SagaStepEntity saveSagaStep(SagaInstanceEntity sagaInstance, String stepName, String aggregateId, String aggregateType, CommandPayload command, int executionOrder) {
+        command.setSagaId(sagaInstance.getId());
+        command.setStepId(String.valueOf(uuidGenerator.nextId()));
+
+        String stringCommand = serializePayload(command);
+
         return sagaStepJpaRepository.saveAndFlush(
             SagaStepEntity.builder()
                 .id(String.valueOf(uuidGenerator.nextId()))
@@ -126,7 +131,7 @@ public class PaymentCommandGateway implements CommandGateway{
                 .stepType(SagaStepEntity.StepType.FORWARD)
                 .status(SagaStepEntity.StepStatus.IN_PROGRESS)
                 .executionOrder(executionOrder)
-                .command(command)
+                .command(stringCommand)
                 .build()
         );
     }

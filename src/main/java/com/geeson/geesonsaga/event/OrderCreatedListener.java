@@ -36,11 +36,11 @@ public class OrderCreatedListener {
     public void handleOrderCreated(String message) throws Exception {
         // 1. Kafka 메시지 파싱
         OrderCreatedEvent event = objectMapper.readValue(message, OrderCreatedEvent.class);
-        String sagaId = String.valueOf(uuidGenerator.nextId());
+        final String sagaId = String.valueOf(uuidGenerator.nextId());
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
-        sagaInstanceJpaRepository.save(new SagaInstanceEntity(
+        SagaInstanceEntity sagaInstance = sagaInstanceJpaRepository.save(new SagaInstanceEntity(
             sagaId,
             "ORDER",
             OrderSagaState.ORDER_CREATED,
@@ -50,11 +50,11 @@ public class OrderCreatedListener {
             new ArrayList<>()
         ));
 
-        try {
-            stateMachinePersister.restore(stateMachine, sagaId);
-        } catch (Exception ignore) {
-            log.info("restore state machine failed for sagaId: " + sagaId);
-        }
+//        try {
+//            stateMachinePersister.restore(stateMachine, sagaId);
+//        } catch (Exception ignore) {
+//            log.info("restore state machine failed for sagaId: " + sagaId);
+//        }
 
         // 3. Saga 상태 전이
         stateMachine

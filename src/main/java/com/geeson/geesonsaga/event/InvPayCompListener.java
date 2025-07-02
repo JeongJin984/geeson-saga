@@ -10,6 +10,7 @@ import com.geeson.geesonsaga.enums.OrderSagaEvent;
 import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.InvInvCompSuccessEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
@@ -22,6 +23,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class InvPayCompListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
@@ -70,14 +72,28 @@ public class InvPayCompListener {
             sagaInstanceRepository.save(saga);
 
             // Optionally trigger statemachine event to move to COMPENSATED state
-            StateMachine<OrderSagaState, OrderSagaEvent> sm = stateMachineFactory.getStateMachine(sagaId);
-            sm
-                .sendEvent(Mono.just(
+            StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
+
+            try {
+                stateMachinePersister.restore(stateMachine, sagaId);
+            } catch (Exception ignore) {
+                log.info("restore state machine failed for sagaId: " + sagaId);
+                throw new RuntimeException("StateMachine restore failed", ignore);
+            }
+
+            stateMachine.sendEvent(Mono.just(
                     MessageBuilder
                         .withPayload(OrderSagaEvent.INVENTORY_COMPENSATED)
                         .setHeader("sagaId", sagaId)
                         .build()
                 ))
+                .doOnComplete(() -> {
+                    try {
+                        stateMachinePersister.persist(stateMachine, sagaId);
+                    }catch (Exception e) {
+                        throw new RuntimeException("StateMachine persist failed", e);
+                    }
+                })
                 .subscribe();
         }
     }

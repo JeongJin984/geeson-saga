@@ -13,6 +13,7 @@ import com.geeson.geesonsaga.enums.OrderSagaState;
 import com.geeson.geesonsaga.event.event.InvInvCompFailEvent;
 import com.geeson.geesonsaga.event.event.InvInvCompSuccessEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
@@ -25,6 +26,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class InvInvCompListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
@@ -74,12 +76,18 @@ public class InvInvCompListener {
             sagaInstanceRepository.save(saga);
 
             StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
-            stateMachine
-                .sendEvent(Mono.just(MessageBuilder
+
+            stateMachine.sendEvent(Mono.just(MessageBuilder
                     .withPayload(OrderSagaEvent.INVENTORY_COMPENSATED)
                     .setHeader("sagaId", sagaId)
                     .build()
-                ))
+                )).doOnComplete(() -> {
+                    try {
+                        stateMachinePersister.persist(stateMachine, sagaId);
+                    }catch (Exception e) {
+                        throw new RuntimeException("StateMachine persist failed", e);
+                    }
+                })
                 .subscribe();
         }
     }

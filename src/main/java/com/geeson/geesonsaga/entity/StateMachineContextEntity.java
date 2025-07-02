@@ -13,7 +13,6 @@ import lombok.Setter;
 public class StateMachineContextEntity {
     @Id
     private String id;
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "json")
     private String contextJson;
 }

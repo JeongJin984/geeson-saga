@@ -9,6 +9,7 @@ import com.geeson.geesonsaga.event.event.InventoryReserveFailedEvent;
 import com.geeson.geesonsaga.event.event.PaymentFailedEvent;
 import com.geeson.geesonsaga.support.UuidGenerator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.statemachine.StateMachine;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class InventoryReserveListener {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final StateMachineFactory<OrderSagaState, OrderSagaEvent> stateMachineFactory;
@@ -35,19 +37,28 @@ public class InventoryReserveListener {
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
+        try {
+            stateMachinePersister.restore(stateMachine, sagaId);
+        } catch (Exception ignore) {
+            log.info("restore state machine failed for sagaId: " + sagaId);
+            throw new RuntimeException("StateMachine restore failed", ignore);
+        }
+
         // 3. Saga 상태 전이
-        stateMachine
-            .sendEvent(
+        stateMachine.sendEvent(
                 Mono.just(MessageBuilder
                     .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
                     .setHeader("sagaId", sagaId)
                     .build()
                 )
-            )
+            ).doOnComplete(() -> {
+                try {
+                    stateMachinePersister.persist(stateMachine, sagaId);
+                }catch (Exception e) {
+                    throw new RuntimeException("StateMachine persist failed", e);
+                }
+            })
             .subscribe();
-
-        // 4. 상태 저장
-        stateMachinePersister.persist(stateMachine, sagaId);
 
         System.out.println("Inventory reserved for sagaId: " + sagaId);
     }
@@ -63,9 +74,15 @@ public class InventoryReserveListener {
 
         StateMachine<OrderSagaState, OrderSagaEvent> stateMachine = stateMachineFactory.getStateMachine(sagaId);
 
+        try {
+            stateMachinePersister.restore(stateMachine, sagaId);
+        } catch (Exception ignore) {
+            log.info("restore state machine failed for sagaId: " + sagaId);
+            throw new RuntimeException("StateMachine restore failed", ignore);
+        }
+
         // 3. Saga 상태 전이
-        stateMachine
-            .sendEvent(
+        stateMachine.sendEvent(
                 Mono.just(
                     MessageBuilder
                         .withPayload(OrderSagaEvent.PAYMENT_FAILURE)
@@ -76,7 +93,13 @@ public class InventoryReserveListener {
                         .setHeader("reason", event.reason())
                         .build()
                 )
-            )
+            ).doOnComplete(() -> {
+                try {
+                    stateMachinePersister.persist(stateMachine, sagaId);
+                }catch (Exception e) {
+                    throw new RuntimeException("StateMachine persist failed", e);
+                }
+            })
             .subscribe();
 
         // 4. 상태 저장

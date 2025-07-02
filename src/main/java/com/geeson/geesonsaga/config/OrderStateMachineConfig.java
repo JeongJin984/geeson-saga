@@ -116,6 +116,7 @@ public class OrderStateMachineConfig extends EnumStateMachineConfigurerAdapter<O
     public void configure(StateMachineConfigurationConfigurer<OrderSagaState, OrderSagaEvent> config) throws Exception {
         config
             .withConfiguration()
+            .machineId("order-saga-machine")
             .autoStartup(false)
             .listener(new StateMachineListenerAdapter<>() {
                 @Override
