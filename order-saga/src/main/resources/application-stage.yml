@@ -1,0 +1,13 @@
+spring:
+  application:
+    name : geeson-saga
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql:3306/saga_db
+    username: root
+    password: rootpass^^*
+  kafka:
+    bootstrap-servers: kafka:29092
+
+uuid:
+  node-id: ${NODE_ID:0}

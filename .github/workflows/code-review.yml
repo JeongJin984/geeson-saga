@@ -1,0 +1,30 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    if: github.event.pull_request.base.ref == 'stage'  # <-- 여기 주목
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests openai
+
+      - name: Run ChatGPT Code Review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEESON_REPO_TOKEN: ${{ secrets.GEESON_REPO_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REF: ${{ github.ref }}
+        run: python scripts/review_pr.py

@@ -1,0 +1,27 @@
+pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if(requested.id.id == 'org.springframework.boot') useVersion springBootVersion as String
+            if(requested.id.id == 'io.spring.dependency-management') useVersion springDependencyManagerVersion as String
+        }
+    }
+}
+
+rootProject.name = 'geeson-saga'
+
+include(
+    'support',
+    'support:command',
+    'support:event',
+    'support:uuid',
+
+    'order-saga',
+
+    'infra',
+    'infra:rdb',
+    'infra:rdb:order-db',
+    'infra:queue',
+    'infra:queue:order-kafka',
+    'infra:uuid-impl',
+
+)

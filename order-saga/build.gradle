@@ -1,0 +1,19 @@
+dependencies {
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.statemachine:spring-statemachine-starter:3.2.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    runtimeOnly("mysql:mysql-connector-java:${property("mysqlVersion")}")
+
+    implementation project(path: ":support:command")
+    implementation project(path: ":support:event")
+    implementation project(path: ":support:uuid")
+
+    implementation project(path: ":infra:queue:order-kafka")
+    implementation project(path: ":infra:rdb:order-db")
+    implementation project(path: ":infra:uuid-impl")
+}

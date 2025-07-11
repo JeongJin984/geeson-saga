@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 로그 경로 및 파일명 설정 -->
+    <property name="LOG_PATH" value="/logs"/>
+    <property name="LOG_FILE" value="${LOG_PATH}/order-saga.log"/>
+
+    <!-- 콘솔 로그 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 파일 로그 with 롤링 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 일자별 로그 파일명 -->
+            <fileNamePattern>${LOG_PATH}/order-saga.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 루트 로거 설정 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>
