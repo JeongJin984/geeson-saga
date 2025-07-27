@@ -104,6 +104,6 @@ public class PaymentRequestListener {
             .subscribe();
 
         // 5. 실패 알림 및 보상 트랜잭션 트리거 등 후처리 가능
-        System.out.println("Payment failed for sagaId: " + sagaId + ". Saga transitioned to FAILED.");
+//        System.out.println("Payment failed for sagaId: " + sagaId + ". Saga transitioned to FAILED.");
     }
 }

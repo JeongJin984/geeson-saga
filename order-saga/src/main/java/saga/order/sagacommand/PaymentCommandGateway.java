@@ -60,6 +60,7 @@ public class PaymentCommandGateway implements CommandGateway {
                 request.orderId(),
                 request.customerId(),
                 String.valueOf(uuidGenerator.nextId()),
+                request.paymentKey(),
                 request.totalPrice(),
                 request.paymentMethodId(),
                 request.currency()
