@@ -71,6 +71,7 @@ public class OrderCreatedListener {
                                 event.orderId(),
                                 event.customerId(),
                                 String.valueOf(uuidGenerator.nextId()),
+                                event.paymentKey(),
                                 event.totalPrice(),
                                 event.paymentMethodId(),
                                 event.currency()

@@ -17,6 +17,7 @@ public class PaymentRequestPayload extends CommandPayload {
     private String orderId;
     private String userId;
     private String paymentId;
+    private String paymentKey;
     private BigDecimal amount;
     private String paymentMethodId;
     private String currency;
